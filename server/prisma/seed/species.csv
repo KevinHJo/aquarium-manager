@@ -1,0 +1,17 @@
+scientific_name,common_name,water_type,temperament,min_tank_liters,adult_size_cm,ph_min,ph_max,temp_min_c,temp_max_c
+Paracheirodon innesi,Neon Tetra,FRESHWATER,PEACEFUL,40,3.5,5.0,7.0,20,26
+Paracheirodon axelrodi,Cardinal Tetra,FRESHWATER,PEACEFUL,60,4,4.5,7.0,23,29
+Betta splendens,Betta,FRESHWATER,SEMI_AGGRESSIVE,20,6.5,6.0,7.5,24,28
+Poecilia reticulata,Guppy,FRESHWATER,PEACEFUL,40,5,7.0,8.0,22,28
+Corydoras paleatus,Peppered Cory,FRESHWATER,PEACEFUL,60,6.5,6.0,7.5,18,24
+Pterophyllum scalare,Angelfish,FRESHWATER,SEMI_AGGRESSIVE,150,15,6.0,7.5,24,29
+Danio rerio,Zebra Danio,FRESHWATER,PEACEFUL,60,5,6.5,7.5,18,25
+Ancistrus cirrhosus,Bristlenose Pleco,FRESHWATER,PEACEFUL,100,13,6.0,7.5,22,27
+Mikrogeophagus ramirezi,German Blue Ram,FRESHWATER,PEACEFUL,75,6,5.0,7.0,26,30
+Astronotus ocellatus,Oscar,FRESHWATER,AGGRESSIVE,300,30,6.0,7.5,23,27
+Carassius auratus,Goldfish,FRESHWATER,PEACEFUL,150,20,6.5,8.0,15,23
+Trigonostigma heteromorpha,Harlequin Rasbora,FRESHWATER,PEACEFUL,60,4.5,5.5,7.5,22,27
+Neocaridina davidi,Cherry Shrimp,FRESHWATER,PEACEFUL,20,3,6.5,8.0,18,26
+Brachygobius doriae,Bumblebee Goby,BRACKISH,SEMI_AGGRESSIVE,40,4,7.0,8.5,22,28
+Amphiprion ocellaris,Ocellaris Clownfish,SALTWATER,SEMI_AGGRESSIVE,75,9,8.0,8.4,24,27
+Paracanthurus hepatus,Blue Tang,SALTWATER,SEMI_AGGRESSIVE,450,30,8.1,8.4,24,27

@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WaterType {
+  FRESHWATER
+  BRACKISH
+  SALTWATER
+}
+
+enum Temperament {
+  PEACEFUL
+  SEMI_AGGRESSIVE
+  AGGRESSIVE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  tanks     Tank[]
+}
+
+model Tank {
+  id           String    @id @default(uuid())
+  ownerId      String
+  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name         String
+  volumeLiters Float
+  waterType    WaterType
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([ownerId])
+}
+
+// Shared catalog, loaded by scripts/import-species.ts. Not owned by any user.
+model Species {
+  id             Int         @id @default(autoincrement())
+  scientificName String      @unique
+  commonName     String
+  waterType      WaterType
+  temperament    Temperament
+  minTankLiters  Int
+  adultSizeCm    Float
+  phMin          Float
+  phMax          Float
+  tempMinC       Float
+  tempMaxC       Float
+}
