@@ -16,6 +16,7 @@ interface SpeciesArgs {
 interface CreateTankArgs {
   input: {
     name: string;
+    hospital?: boolean | null;
     volumeLiters: number;
     waterType: WaterType;
     notes?: string | null;
@@ -58,6 +59,7 @@ export const resolvers = {
         data: {
           ownerId: userId,
           name,
+          hospital: input.hospital ?? false,
           volumeLiters: input.volumeLiters,
           waterType: input.waterType,
           notes: input.notes ?? null,

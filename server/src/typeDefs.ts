@@ -11,12 +11,30 @@ export const typeDefs = `#graphql
     AGGRESSIVE
   }
 
+  enum LivestockStatus {
+    HEALTHY
+    SICK
+    DECEASED
+    SOLD
+  }
+
   type Tank {
     id: ID!
     name: String!
     volumeLiters: Float!
     waterType: WaterType!
+    hospital: Boolean!
     notes: String
+    livestock: [Livestock!]!
+    "ISO 8601 timestamp"
+    createdAt: String!
+  }
+
+  type Livestock {
+    id: ID!
+    name: String
+    species: Species!
+    status: LivestockStatus!
     "ISO 8601 timestamp"
     createdAt: String!
   }
@@ -39,7 +57,14 @@ export const typeDefs = `#graphql
     name: String!
     volumeLiters: Float!
     waterType: WaterType!
+    hospital: Boolean
     notes: String
+  }
+
+  input CreateLivestockInput {
+    tankId: ID!
+    speciesId: ID!
+    name: String
   }
 
   type Query {
@@ -53,5 +78,6 @@ export const typeDefs = `#graphql
 
   type Mutation {
     createTank(input: CreateTankInput!): Tank!
+    createLivestock(input: CreateLivestockInput!): Livestock!
   }
 `;
