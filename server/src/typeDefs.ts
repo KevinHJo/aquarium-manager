@@ -55,16 +55,17 @@ export const typeDefs = `#graphql
 
   input CreateTankInput {
     name: String!
+    hospital: Boolean
     volumeLiters: Float!
     waterType: WaterType!
-    hospital: Boolean
     notes: String
   }
 
   input CreateLivestockInput {
+    name: String
     tankId: ID!
     speciesId: ID!
-    name: String
+    status: LivestockStatus
   }
 
   type Query {
