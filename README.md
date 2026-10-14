@@ -64,3 +64,5 @@ server/
 ```
 
 There is no login yet. `src/index.ts` creates a single dev user and every request runs as that user.
+
+code --folder-uri vscode-remote://wsl+ubuntu/home/kevin-linux/Projects/aquarium-manager

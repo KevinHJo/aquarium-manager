@@ -19,6 +19,13 @@ enum Temperament {
   AGGRESSIVE
 }
 
+enum LivestockStatus {
+  HEALTHY
+  SICK
+  DECEASED
+  SOLD
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -28,17 +35,50 @@ model User {
 }
 
 model Tank {
+  id              String    @id @default(uuid())
+  ownerId         String
+  owner           User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name            String
+  volumeLiters    Float
+  waterType       WaterType
+  hospital        Boolean   @default(false)
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  livestock       Livestock[]
+  livestockStays  LivestockStay[]
+
+  @@index([ownerId])
+}
+
+model Livestock {
+  id              String    @id @default(uuid())
+  tankId          String
+  tank            Tank      @relation(fields: [tankId], references: [id], onDelete: Cascade)
+  speciesId       Int
+  species         Species   @relation(fields: [speciesId], references: [id])
+  name            String?
+  status          LivestockStatus    @default(HEALTHY)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  livestockStays  LivestockStay[]
+
+  @@index([tankId])
+}
+
+model LivestockStay {
   id           String    @id @default(uuid())
-  ownerId      String
-  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  name         String
-  volumeLiters Float
-  waterType    WaterType
-  notes        String?
+  livestockId  String
+  livestock    Livestock @relation(fields: [livestockId], references: [id], onDelete: Cascade)
+  tankId       String
+  tank         Tank      @relation(fields: [tankId], references: [id], onDelete: Cascade)
+  startDate    DateTime  @default(now())
+  endDate      DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  @@index([ownerId])
+  @@index([tankId])
+  @@index([livestockId, startDate])
 }
 
 // Shared catalog, loaded by scripts/import-species.ts. Not owned by any user.
@@ -54,4 +94,5 @@ model Species {
   phMax          Float
   tempMinC       Float
   tempMaxC       Float
+  livestock      Livestock[]
 }
