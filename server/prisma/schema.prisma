@@ -26,56 +26,86 @@ enum LivestockStatus {
   SOLD
 }
 
+enum FoodType {
+  FROZEN
+  FLAKE
+  PELLET
+  LIVE
+  OTHER
+}
+
+enum DoseUnit {
+  ML
+  DROPS
+  GRAMS
+  TABLETS
+}
+
+enum MaintenanceType {
+  WATER_CHANGE
+  GLASS_CLEANING
+  GRAVEL_VACUUM
+  FILTER_CLEANING
+  PROTEIN_SKIMMER_CLEANING
+  FILTER_CHANGE
+  OTHER
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  tanks     Tank[]
+  id          String       @id @default(uuid())
+  email       String       @unique
+  name        String?
+  createdAt   DateTime     @default(now())
+  tanks       Tank[]
+  medications Medication[]
+  foods       Food[]
 }
 
 model Tank {
-  id              String    @id @default(uuid())
-  ownerId         String
-  owner           User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  name            String
-  volumeLiters    Float
-  waterType       WaterType
-  hospital        Boolean   @default(false)
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  livestock       Livestock[]
-  livestockStays  LivestockStay[]
+  id                   String                @id @default(uuid())
+  ownerId              String
+  owner                User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name                 String
+  volumeLiters         Float
+  waterType            WaterType
+  hospital             Boolean               @default(false)
+  notes                String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  livestock            Livestock[]
+  livestockStays       LivestockStay[]
+  feedingSchedules     FeedingSchedule[]
+  treatmentSchedules   TreatmentSchedule[]
+  maintenanceSchedules MaintenanceSchedule[]
 
   @@index([ownerId])
 }
 
 model Livestock {
-  id              String    @id @default(uuid())
-  tankId          String
-  tank            Tank      @relation(fields: [tankId], references: [id], onDelete: Cascade)
-  speciesId       Int
-  species         Species   @relation(fields: [speciesId], references: [id])
-  name            String?
-  status          LivestockStatus    @default(HEALTHY)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  livestockStays  LivestockStay[]
+  id             String          @id @default(uuid())
+  tankId         String
+  tank           Tank            @relation(fields: [tankId], references: [id], onDelete: Cascade)
+  speciesId      Int
+  species        Species         @relation(fields: [speciesId], references: [id])
+  name           String?
+  status         LivestockStatus @default(HEALTHY)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  livestockStays LivestockStay[]
 
   @@index([tankId])
 }
 
 model LivestockStay {
-  id           String    @id @default(uuid())
-  livestockId  String
-  livestock    Livestock @relation(fields: [livestockId], references: [id], onDelete: Cascade)
-  tankId       String
-  tank         Tank      @relation(fields: [tankId], references: [id], onDelete: Cascade)
-  startDate    DateTime  @default(now())
-  endDate      DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  livestockId String
+  livestock   Livestock @relation(fields: [livestockId], references: [id], onDelete: Cascade)
+  tankId      String
+  tank        Tank      @relation(fields: [tankId], references: [id], onDelete: Cascade)
+  startDate   DateTime  @default(now())
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([tankId])
   @@index([livestockId, startDate])
@@ -95,4 +125,136 @@ model Species {
   tempMinC       Float
   tempMaxC       Float
   livestock      Livestock[]
+  unsafeFoods    Food[]
+}
+
+// Shared catalog, loaded by scripts/import-foods.ts.
+// Curated entries have no owner. Custom entries belong to the user who created them
+// and are only visible to that user.
+model Food {
+  id               Int               @id @default(autoincrement())
+  ownerId          String?
+  owner            User?             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name             String
+  type             FoodType
+  unsafeFor        Species[]
+  feedingSchedules FeedingSchedule[]
+
+  // Postgres treats NULLs as distinct, so this only covers custom entries. Curated names are
+  // kept unique by a partial index added by hand in the migration SQL.
+  @@unique([ownerId, name])
+}
+
+// Shared catalog, loaded by scripts/import-medications.ts.
+// Curated entries have no owner. Custom entries belong to the user who created them
+// and are only visible to that user.
+model Medication {
+  id                 Int                 @id @default(autoincrement())
+  ownerId            String?
+  owner              User?               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name               String
+  // Recommended dose: doseAmount doseUnit per dosePerLiters liters of water.
+  doseAmount         Float
+  doseUnit           DoseUnit
+  dosePerLiters      Float
+  treatmentSchedules TreatmentSchedule[]
+
+  // Postgres treats NULLs as distinct, so this only covers custom entries. Curated names are
+  // kept unique by a partial index added by hand in the migration SQL.
+  @@unique([ownerId, name])
+}
+
+model FeedingSchedule {
+  id            String       @id @default(uuid())
+  tankId        String
+  tank          Tank         @relation(fields: [tankId], references: [id], onDelete: Cascade)
+  foodId        Int
+  food          Food         @relation(fields: [foodId], references: [id], onDelete: NoAction)
+  feedingAmount Float
+  feedingUnit   String
+  startDate     DateTime     @db.Date
+  // Null while the schedule is ongoing.
+  endDate       DateTime?    @db.Date
+  timesPerDay   Int          @default(1)
+  intervalDays  Int          @default(1)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  logs          FeedingLog[]
+
+  @@index([tankId])
+}
+
+model TreatmentSchedule {
+  id           String         @id @default(uuid())
+  tankId       String
+  tank         Tank           @relation(fields: [tankId], references: [id], onDelete: Cascade)
+  medicationId Int
+  // NoAction rather than Restrict: deleting a user cascades to both their tanks and their
+  // custom medications. NoAction checks at the end of the statement, after every cascade,
+  // so the result does not depend on the order Postgres runs them in.
+  medication   Medication     @relation(fields: [medicationId], references: [id], onDelete: NoAction)
+  // The amount planned to be given, assumed to be in the associated medication's doseUnit.
+  doseAmount   Float
+  startDate    DateTime       @db.Date
+  // Null while the treatment is ongoing.
+  endDate      DateTime?      @db.Date
+  timesPerDay  Int            @default(1)
+  intervalDays Int            @default(1)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  logs         TreatmentLog[]
+
+  @@index([tankId])
+}
+
+model MaintenanceSchedule {
+  id           String           @id @default(uuid())
+  tankId       String
+  tank         Tank             @relation(fields: [tankId], references: [id], onDelete: Cascade)
+  type         MaintenanceType
+  startDate    DateTime         @db.Date
+  // Null while the schedule is ongoing.
+  endDate      DateTime?        @db.Date
+  timesPerDay  Int              @default(1)
+  intervalDays Int              @default(1)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  logs         MaintenanceLog[]
+
+  @@index([tankId])
+}
+
+model FeedingLog {
+  id         String          @id @default(uuid())
+  scheduleId String
+  schedule   FeedingSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  fedAt      DateTime        @default(now())
+  notes      String?
+  createdAt  DateTime        @default(now())
+
+  @@index([scheduleId, fedAt])
+}
+
+model TreatmentLog {
+  id         String            @id @default(uuid())
+  scheduleId String
+  schedule   TreatmentSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  dosedAt    DateTime          @default(now())
+  // The amount actually given, assumed to be in the associated medication's doseUnit.
+  doseAmount Float?
+  notes      String?
+  createdAt  DateTime          @default(now())
+
+  @@index([scheduleId, dosedAt])
+}
+
+model MaintenanceLog {
+  id          String              @id @default(uuid())
+  scheduleId  String
+  schedule    MaintenanceSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  performedAt DateTime            @default(now())
+  notes       String?
+  createdAt   DateTime            @default(now())
+
+  @@index([scheduleId, performedAt])
 }
