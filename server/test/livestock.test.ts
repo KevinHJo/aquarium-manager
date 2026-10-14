@@ -89,7 +89,11 @@ describe('create livestock', () => {
 
     expect(larrysFish.errors).toBeUndefined();
     expect(bobsFish.errors?.[0]?.extensions?.code).toBe('BAD_USER_INPUT')
+    expect(bobsFish.errors?.[0]?.message).toBe('Tank not found.')
     expect(larrysFish.data?.createLivestock).toMatchObject({ name: null, status: 'HEALTHY'})
+
+    const count = await prisma.livestock.count();
+    expect(count).toBe(1);
 
     const saved = await prisma.livestock.findUniqueOrThrow({ where: { id: larrysFish.data?.createLivestock.id } });
     expect(saved.tankId).toBe(larryTankId)
@@ -157,6 +161,9 @@ describe('create livestock', () => {
     const input = { tankId: crypto.randomUUID(), speciesId: neonTetraId }
     const result = await execute(CREATE_LIVESTOCK, { input }, larryId)
 
+    const count = await prisma.livestock.count()
+    expect(count).toBe(0)
+
     expect(result.errors?.[0]?.message).toBe('Tank not found.')
   })
 
@@ -169,6 +176,9 @@ describe('create livestock', () => {
     const result3 = await execute(CREATE_LIVESTOCK, { input: input3 }, larryId)
     const input4 = { tankId: larryTankId, speciesId: String(Number(neonTetraId) + 1) }
     const result4 = await execute(CREATE_LIVESTOCK, { input: input4 }, larryId)
+
+    const count = await prisma.livestock.count()
+    expect(count).toBe(0)
 
     expect(result1.errors?.[0]?.message).toBe('Species not found.')
     expect(result2.errors?.[0]?.message).toBe('Species not found.')
