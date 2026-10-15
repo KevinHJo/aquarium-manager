@@ -51,6 +51,7 @@ export const typeDefs = `#graphql
     hospital: Boolean!
     notes: String
     livestock: [Livestock!]!
+    feedingSchedules: [FeedingSchedule!]!
     "ISO 8601 timestamp"
     createdAt: String!
   }
@@ -78,6 +79,39 @@ export const typeDefs = `#graphql
     tempMaxC: Float!
   }
 
+  type Food {
+    id: ID!
+    isCustom: Boolean!
+    name: String!
+    type: FoodType!
+    unsafeFor: [Species!]!
+  }
+
+  type FeedingSchedule {
+    id: ID!
+    food: Food!
+    feedingAmount: Float!
+    feedingUnit: String!
+    "Date, YYYY-MM-DD"
+    startDate: String!
+    "Date, YYYY-MM-DD"
+    endDate: String
+    timesPerDay: Int!
+    intervalDays: Int!
+    "ISO 8601 timestamp"
+    createdAt: String!
+    logs(limit: Int! = 20): [FeedingLog!]!
+  }
+
+  type FeedingLog {
+    id: ID!
+    "ISO 8601 timestamp"
+    fedAt: String!
+    notes: String
+    "ISO 8601 timestamp"
+    createdAt: String!
+  }
+
   input CreateTankInput {
     name: String!
     hospital: Boolean
@@ -98,6 +132,34 @@ export const typeDefs = `#graphql
     newTankId: ID!
   }
 
+  input CreateFoodInput {
+    name: String!
+    type: FoodType!
+    unsafeForSpeciesIds: [ID!]
+  }
+
+  input CreateFeedingScheduleInput {
+    tankId: ID!
+    foodId: ID!
+    feedingAmount: Float!
+    feedingUnit: String!
+    startDate: String!
+    endDate: String
+    timesPerDay: Int! = 1
+    intervalDays: Int! = 1
+  }
+
+  input EndFeedingScheduleInput {
+    feedingScheduleId: ID!
+    endDate: String!
+  }
+
+  input CreateFeedingLogInput {
+    scheduleId: ID!
+    fedAt: String
+    notes: String
+  }
+
   type Query {
     "The current user's tanks, oldest first."
     tanks: [Tank!]!
@@ -105,11 +167,17 @@ export const typeDefs = `#graphql
     tank(id: ID!): Tank
     "The species catalog, optionally filtered by name and water type."
     species(search: String, waterType: WaterType): [Species!]!
+    "The food catalog, optionally filtered by name and type. Contains curated foods and the current user's custom foods."
+    foods(search: String, type: FoodType): [Food!]!
   }
 
   type Mutation {
     createTank(input: CreateTankInput!): Tank!
     createLivestock(input: CreateLivestockInput!): Livestock!
     moveLivestock(input: MoveLivestockInput!): Livestock!
+    createFood(input: CreateFoodInput!): Food!
+    createFeedingSchedule(input: CreateFeedingScheduleInput!): FeedingSchedule!
+    endFeedingSchedule(input: EndFeedingScheduleInput!): FeedingSchedule!
+    createFeedingLog(input: CreateFeedingLogInput!): FeedingLog!
   }
 `;
