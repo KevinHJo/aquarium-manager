@@ -18,6 +18,31 @@ export const typeDefs = `#graphql
     SOLD
   }
 
+  enum FoodType {
+    FROZEN
+    FLAKE
+    PELLET
+    LIVE
+    OTHER
+  }
+
+  enum DoseUnit {
+    ML
+    DROPS
+    GRAMS
+    TABLETS
+  }
+
+  enum MaintenanceType {
+    WATER_CHANGE
+    GLASS_CLEANING
+    GRAVEL_VACUUM
+    FILTER_CLEANING
+    PROTEIN_SKIMMER_CLEANING
+    FILTER_CHANGE
+    OTHER
+  }
+
   type Tank {
     id: ID!
     name: String!
@@ -68,6 +93,11 @@ export const typeDefs = `#graphql
     status: LivestockStatus
   }
 
+  input MoveLivestockInput {
+    livestockId: ID!
+    newTankId: ID!
+  }
+
   type Query {
     "The current user's tanks, oldest first."
     tanks: [Tank!]!
@@ -80,5 +110,6 @@ export const typeDefs = `#graphql
   type Mutation {
     createTank(input: CreateTankInput!): Tank!
     createLivestock(input: CreateLivestockInput!): Livestock!
+    moveLivestock(input: MoveLivestockInput!): Livestock!
   }
 `;

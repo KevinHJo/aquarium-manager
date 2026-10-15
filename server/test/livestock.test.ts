@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import type { Livestock } from '@prisma/client';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/db';
 import { createApolloServer } from '../src/server';
@@ -26,6 +27,12 @@ const TANK_LIVESTOCK = `#graphql
     tank(id: $tankId) {
       livestock { id name status createdAt species { id commonName } }
     }
+  }
+`;
+
+const MOVE_LIVESTOCK = `#graphql
+  mutation MoveLivestock($input: MoveLivestockInput!) {
+    moveLivestock(input: $input) { id name status createdAt species { id commonName } }
   }
 `;
 
@@ -188,53 +195,189 @@ describe('create livestock', () => {
 });
 
 describe('livestock queries', () => {
-    it('only returns healthy and sick livestock in a tank', async() => {
-      const healthyFish = await prisma.livestock.create({
-        data: {
-          tankId: larryTankId,
-          speciesId: Number(neonTetraId),
-          status: 'HEALTHY',
-          livestockStays: { create: { tankId: larryTankId } }
-        }
-      });
-      const sickFish = await prisma.livestock.create({
-        data: {
-          tankId: larryTankId,
-          speciesId: Number(neonTetraId),
-          status: 'SICK',
-          livestockStays: { create: { tankId: larryTankId } }
-        }
-      });
-      const deceasedFish = await prisma.livestock.create({
-        data: {
-          tankId: larryTankId,
-          speciesId: Number(neonTetraId),
-          status: 'DECEASED',
-          livestockStays: { create: { tankId: larryTankId } }
-        }
-      });
-      const soldFish = await prisma.livestock.create({
-        data: {
-          tankId: larryTankId,
-          speciesId: Number(neonTetraId),
-          status: 'SOLD',
-          livestockStays: { create: { tankId: larryTankId } }
-        }
-      });
-
-      const result = await execute(TANK_LIVESTOCK, { tankId: larryTankId}, larryId)
-      const ids = result.data?.tank?.livestock.map( (fish: { id: string }) => fish.id)
-
-      expect(ids).toContain(healthyFish.id)
-      expect(ids).toContain(sickFish.id)
-      expect(ids).not.toContain(deceasedFish.id)
-      expect(ids).not.toContain(soldFish.id)
+  it('only returns healthy and sick livestock in a tank', async() => {
+    const healthyFish = await prisma.livestock.create({
+      data: {
+        tankId: larryTankId,
+        speciesId: Number(neonTetraId),
+        status: 'HEALTHY',
+        livestockStays: { create: { tankId: larryTankId } }
+      }
+    });
+    const sickFish = await prisma.livestock.create({
+      data: {
+        tankId: larryTankId,
+        speciesId: Number(neonTetraId),
+        status: 'SICK',
+        livestockStays: { create: { tankId: larryTankId } }
+      }
+    });
+    const deceasedFish = await prisma.livestock.create({
+      data: {
+        tankId: larryTankId,
+        speciesId: Number(neonTetraId),
+        status: 'DECEASED',
+        livestockStays: { create: { tankId: larryTankId } }
+      }
+    });
+    const soldFish = await prisma.livestock.create({
+      data: {
+        tankId: larryTankId,
+        speciesId: Number(neonTetraId),
+        status: 'SOLD',
+        livestockStays: { create: { tankId: larryTankId } }
+      }
     });
 
-    it('returns the correct species associated with the livestock', async() => {
-      const input = { tankId: larryTankId, speciesId: neonTetraId }
-      const result = await execute(CREATE_LIVESTOCK, { input }, larryId)
+    const result = await execute(TANK_LIVESTOCK, { tankId: larryTankId}, larryId)
+    const ids = result.data?.tank?.livestock.map( (fish: { id: string }) => fish.id)
 
-      expect(result.data?.createLivestock?.species?.commonName).toBe('Neon tetra')
+    expect(ids).toContain(healthyFish.id)
+    expect(ids).toContain(sickFish.id)
+    expect(ids).not.toContain(deceasedFish.id)
+    expect(ids).not.toContain(soldFish.id)
+  });
+
+  it('returns the correct species associated with the livestock', async() => {
+    const input = { tankId: larryTankId, speciesId: neonTetraId }
+    const result = await execute(CREATE_LIVESTOCK, { input }, larryId)
+
+    expect(result.data?.createLivestock?.species?.commonName).toBe('Neon tetra')
+  })
+});
+
+describe('move livestock', () => {
+  let peanut: Livestock;
+  let larryTankId2: string;
+  beforeEach(async() => {
+    peanut = await prisma.livestock.create({
+      data: {
+        name: 'Peanut',
+        tankId: larryTankId,
+        speciesId: Number(neonTetraId),
+        livestockStays: { create: { tankId: larryTankId } }
+      }
+    });
+
+    const larryTank2 = await prisma.tank.create({
+      data: {
+        ownerId: larryId,
+        name: 'The Second Tank of Larry',
+        volumeLiters: 300,
+        waterType: 'SALTWATER',
+      }
     })
+    larryTankId2 = larryTank2.id
+  });
+
+  it('successfully moves livestock to a new tank', async() => {
+    const input = { livestockId: peanut.id, newTankId: larryTankId2 }
+    const result = await execute(MOVE_LIVESTOCK, { input }, larryId)
+    const livestock = await prisma.livestock.findUnique({ where: { id: result.data?.moveLivestock?.id } })
+
+    expect(result.errors).toBeUndefined();
+    expect(livestock?.tankId).toBe(larryTankId2)
+  })
+
+  it('correctly updates livestock stays', async() => {
+    const input1 = { livestockId: peanut.id, newTankId: larryTankId2 }
+    const move1 = await execute(MOVE_LIVESTOCK, { input: input1 }, larryId)
+    const input2 = { livestockId: peanut.id, newTankId: larryTankId }
+    const move2 = await execute(MOVE_LIVESTOCK, { input: input2 }, larryId)
+    const livestockStays = await prisma.livestockStay.findMany({
+      where: { livestockId: peanut.id },
+      orderBy: { startDate: 'asc' }
+    })
+
+    expect(move1.errors).toBeUndefined();
+    expect(move2.errors).toBeUndefined();
+    expect(livestockStays).toHaveLength(3);
+    expect(livestockStays?.[0]).toMatchObject({ tankId: larryTankId, endDate: livestockStays?.[1]?.startDate });
+    expect(livestockStays?.[1]).toMatchObject({ tankId: larryTankId2, endDate: livestockStays?.[2]?.startDate });
+    expect(livestockStays?.[2]).toMatchObject({ tankId: larryTankId, endDate: null });
+  })
+
+  it('only allows users to move their own livestock to their own tanks', async() => {
+    const larryGoodInput = { livestockId: peanut.id, newTankId: larryTankId2 }
+    const larryBadInput = { livestockId: peanut.id, newTankId: bobTankId }
+    const bobInput = { livestockId: peanut.id, newTankId: larryTankId2 }
+    const larryMoveToLarry = await execute(MOVE_LIVESTOCK, { input: larryGoodInput }, larryId)
+    const larryMoveToBob = await execute(MOVE_LIVESTOCK, { input: larryBadInput }, larryId)
+    const bobMove = await execute(MOVE_LIVESTOCK, { input: bobInput }, bobId)
+
+    expect(larryMoveToLarry.errors).toBeUndefined();
+    expect(larryMoveToBob.errors?.[0]?.message).toBe('New tank not found.')
+    expect(bobMove.errors?.[0]?.message).toBe('Livestock not found.')
+
+    const dbPeanut = await prisma.livestock.findUnique({ where: { id: peanut.id } })
+    expect(dbPeanut?.tankId).toBe(larryTankId2);
+
+    const livestockStays = await prisma.livestockStay.findMany({ where: { livestockId: peanut.id } })
+    expect(livestockStays).toHaveLength(2)
+  })
+
+  it('rejects a move if the fish does not exist', async() => {
+    const input = { livestockId: crypto.randomUUID(), newTankId: peanut.tankId }
+    const result = await execute(MOVE_LIVESTOCK, { input }, larryId)
+
+    expect(result.errors?.[0]?.message).toBe('Livestock not found.')
+  })
+
+  it('rejects a move into the same tank', async() => {
+    const input = { livestockId: peanut.id, newTankId: peanut.tankId }
+    const result = await execute(MOVE_LIVESTOCK, { input }, larryId)
+
+    expect(result.errors?.[0]?.message).toBe('Livestock is already in this tank.')
+
+    const dbPeanut = await prisma.livestock.findUnique({ where: { id: peanut.id } })
+    expect(dbPeanut?.tankId).toBe(larryTankId);
+
+    const livestockStays = await prisma.livestockStay.findMany({ where: { livestockId: peanut.id } })
+    expect(livestockStays).toHaveLength(1)
+  })
+
+  it('rejects a move into a tank that does not exist', async() => {
+    const input = { livestockId: peanut.id, newTankId: crypto.randomUUID() }
+    const result = await execute(MOVE_LIVESTOCK, { input }, larryId)
+
+    expect(result.errors?.[0]?.message).toBe('New tank not found.')
+
+    const dbPeanut = await prisma.livestock.findUnique({ where: { id: peanut.id } })
+    expect(dbPeanut?.tankId).toBe(larryTankId);
+
+    const livestockStays = await prisma.livestockStay.findMany({ where: { livestockId: peanut.id } })
+    expect(livestockStays).toHaveLength(1)
+  })
+
+  it('rejects moving a deceased fish', async() => {
+    const rip = await prisma.livestock.create({
+      data: {
+        name: 'RIP',
+        tankId: larryTankId,
+        status: 'DECEASED',
+        speciesId: Number(neonTetraId),
+        livestockStays: { create: { tankId: larryTankId } }
+      }
+    });
+    const input = { livestockId: rip.id, newTankId: larryTankId2 }
+    const result = await execute(MOVE_LIVESTOCK, { input }, larryId)
+
+    expect(result.errors?.[0]?.message).toBe('Deceased or sold livestock cannot be moved.');
+  })
+
+  it('rejects moving a sold fish', async() => {
+    const lata = await prisma.livestock.create({
+      data: {
+        name: 'BYE FELICIA',
+        tankId: larryTankId,
+        status: 'SOLD',
+        speciesId: Number(neonTetraId),
+        livestockStays: { create: { tankId: larryTankId } }
+      }
+    });
+    const input = { livestockId: lata.id, newTankId: larryTankId2 }
+    const result = await execute(MOVE_LIVESTOCK, { input }, larryId)
+
+    expect(result.errors?.[0]?.message).toBe('Deceased or sold livestock cannot be moved.');
+  })
 });

@@ -31,6 +31,12 @@ interface CreateLivestockArgs {
     status?: LivestockStatus | null;
   }
 }
+interface MoveLivestockArgs {
+  input: {
+    livestockId: string;
+    newTankId: string;
+  }
+}
 
 function badInput(message: string): GraphQLError {
   return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
@@ -107,6 +113,36 @@ export const resolvers = {
           livestockStays: { create: { tankId: tank.id } },
         },
       });
+    },
+    moveLivestock: async(_parent: unknown, { input }: MoveLivestockArgs, { prisma, userId }: Context) => {
+      const livestock = await prisma.livestock.findFirst({
+        where: { id: input.livestockId, tank: { ownerId: userId } }
+      });
+      if (!livestock) throw badInput('Livestock not found.');
+      if (livestock.tankId === input.newTankId) throw badInput('Livestock is already in this tank.')
+      if (livestock.status === 'DECEASED' || livestock.status === 'SOLD') {
+        throw badInput('Deceased or sold livestock cannot be moved.')
+      }
+
+      const newTank = await prisma.tank.findUnique({ where: { id: input.newTankId } })
+      if (!newTank || newTank.ownerId !== userId) throw badInput('New tank not found.')
+
+      const now = new Date();
+      const [, , moved] = await prisma.$transaction([
+        prisma.livestockStay.updateMany({
+          where: { livestockId: livestock.id, endDate: null},
+          data: { endDate: now }
+        }),
+        prisma.livestockStay.create({
+          data: { livestockId: livestock.id, tankId: input.newTankId, startDate: now }
+        }),
+        prisma.livestock.update({
+          where: { id: livestock.id },
+          data: { tankId: input.newTankId}
+        })
+      ]);
+
+      return moved
     },
   },
 
