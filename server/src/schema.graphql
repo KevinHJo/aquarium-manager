@@ -1,0 +1,183 @@
+enum WaterType {
+  FRESHWATER
+  BRACKISH
+  SALTWATER
+}
+
+enum Temperament {
+  PEACEFUL
+  SEMI_AGGRESSIVE
+  AGGRESSIVE
+}
+
+enum LivestockStatus {
+  HEALTHY
+  SICK
+  DECEASED
+  SOLD
+}
+
+enum FoodType {
+  FROZEN
+  FLAKE
+  PELLET
+  LIVE
+  OTHER
+}
+
+enum DoseUnit {
+  ML
+  DROPS
+  GRAMS
+  TABLETS
+}
+
+enum MaintenanceType {
+  WATER_CHANGE
+  GLASS_CLEANING
+  GRAVEL_VACUUM
+  FILTER_CLEANING
+  PROTEIN_SKIMMER_CLEANING
+  FILTER_CHANGE
+  OTHER
+}
+
+type Tank {
+  id: ID!
+  name: String!
+  volumeLiters: Float!
+  waterType: WaterType!
+  hospital: Boolean!
+  notes: String
+  livestock: [Livestock!]!
+  feedingSchedules: [FeedingSchedule!]!
+  "ISO 8601 timestamp"
+  createdAt: String!
+}
+
+type Livestock {
+  id: ID!
+  name: String
+  species: Species!
+  status: LivestockStatus!
+  "ISO 8601 timestamp"
+  createdAt: String!
+}
+
+type Species {
+  id: ID!
+  scientificName: String!
+  commonName: String!
+  waterType: WaterType!
+  temperament: Temperament!
+  minTankLiters: Int!
+  adultSizeCm: Float!
+  phMin: Float!
+  phMax: Float!
+  tempMinC: Float!
+  tempMaxC: Float!
+}
+
+type Food {
+  id: ID!
+  isCustom: Boolean!
+  name: String!
+  type: FoodType!
+  unsafeFor: [Species!]!
+}
+
+type FeedingSchedule {
+  id: ID!
+  food: Food!
+  feedingAmount: Float!
+  feedingUnit: String!
+  "Date, YYYY-MM-DD"
+  startDate: String!
+  "Date, YYYY-MM-DD"
+  endDate: String
+  timesPerDay: Int!
+  intervalDays: Int!
+  "ISO 8601 timestamp"
+  createdAt: String!
+  logs(limit: Int! = 20): [FeedingLog!]!
+}
+
+type FeedingLog {
+  id: ID!
+  "ISO 8601 timestamp"
+  fedAt: String!
+  notes: String
+  "ISO 8601 timestamp"
+  createdAt: String!
+}
+
+input CreateTankInput {
+  name: String!
+  hospital: Boolean
+  volumeLiters: Float!
+  waterType: WaterType!
+  notes: String
+}
+
+input CreateLivestockInput {
+  name: String
+  tankId: ID!
+  speciesId: ID!
+  status: LivestockStatus
+}
+
+input MoveLivestockInput {
+  livestockId: ID!
+  newTankId: ID!
+}
+
+input CreateFoodInput {
+  name: String!
+  type: FoodType!
+  unsafeForSpeciesIds: [ID!]
+}
+
+input CreateFeedingScheduleInput {
+  tankId: ID!
+  foodId: ID!
+  feedingAmount: Float!
+  feedingUnit: String!
+  startDate: String!
+  endDate: String
+  timesPerDay: Int! = 1
+  intervalDays: Int! = 1
+}
+
+input EndFeedingScheduleInput {
+  feedingScheduleId: ID!
+  endDate: String!
+}
+
+input CreateFeedingLogInput {
+  scheduleId: ID!
+  fedAt: String
+  notes: String
+}
+
+type Query {
+  "The current user's tanks, oldest first."
+  tanks: [Tank!]!
+  "One of the current user's tanks, or null if it doesn't exist or isn't theirs."
+  tank(id: ID!): Tank
+  "The species catalog, optionally filtered by name and water type."
+  species(search: String, waterType: WaterType): [Species!]!
+  "The food catalog, optionally filtered by name and type. Contains curated foods and the current user's custom foods."
+  foods(search: String, type: FoodType): [Food!]!
+  "One of the curated or current user's foods."
+  food(id: ID!): Food
+}
+
+type Mutation {
+  createTank(input: CreateTankInput!): Tank!
+  createLivestock(input: CreateLivestockInput!): Livestock!
+  moveLivestock(input: MoveLivestockInput!): Livestock!
+  createFood(input: CreateFoodInput!): Food!
+  createFeedingSchedule(input: CreateFeedingScheduleInput!): FeedingSchedule!
+  endFeedingSchedule(input: EndFeedingScheduleInput!): FeedingSchedule!
+  createFeedingLog(input: CreateFeedingLogInput!): FeedingLog!
+}
