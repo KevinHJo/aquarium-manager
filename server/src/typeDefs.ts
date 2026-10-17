@@ -169,6 +169,8 @@ export const typeDefs = `#graphql
     species(search: String, waterType: WaterType): [Species!]!
     "The food catalog, optionally filtered by name and type. Contains curated foods and the current user's custom foods."
     foods(search: String, type: FoodType): [Food!]!
+    "One of the curated or current user's foods."
+    food(id: ID!): Food
   }
 
   type Mutation {

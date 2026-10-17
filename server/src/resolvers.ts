@@ -1,4 +1,14 @@
-import type { Livestock, LivestockStatus, Prisma, Tank, WaterType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type {
+  Food,
+  FoodType,
+  FeedingSchedule,
+  FeedingLog,
+  Livestock,
+  LivestockStatus,
+  Tank,
+  WaterType
+} from '@prisma/client';
 import { GraphQLError } from 'graphql';
 import type { Context } from './context';
 
@@ -38,14 +48,67 @@ interface MoveLivestockArgs {
   }
 }
 
+interface FoodsArgs {
+  search?: string | null;
+  type?: FoodType | null;
+}
+
+interface FoodArgs {
+  id: string;
+}
+
+interface CreateFoodArgs {
+  input: {
+    name: string;
+    type: FoodType;
+    unsafeForSpeciesIds?: string[] | null;
+  }
+}
+
+interface CreateFeedingScheduleArgs {
+  input: {
+    tankId: string;
+    foodId: string;
+    feedingAmount: number;
+    feedingUnit: string;
+    startDate: string;
+    endDate?: string | null;
+    timesPerDay: number;
+    intervalDays: number;
+  }
+}
+
+interface CreateFeedingLogArgs {
+  input: {
+    scheduleId: string;
+    fedAt?: string | null;
+    notes?: string | null;
+  }
+}
+
 function badInput(message: string): GraphQLError {
   return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
 }
 
-// GraphQL IDs arrive as strings, but Species ids are 32-bit integers in Postgres.
-function parseSpeciesId(id: string): number | null {
+// GraphQL IDs arrive as strings, but Integer ids are 32-bit integers in Postgres.
+function parsePgIntId(id: string): number | null {
   const parsed = Number(id);
   return Number.isInteger(parsed) && parsed > 0 && parsed <= 2_147_483_647 ? parsed : null;
+}
+
+async function checkSpeciesIds(ids: string[] | null | undefined, prisma: Context['prisma']) {
+  const speciesIds: number[] = []
+  for (const raw of ids ?? []) {
+    const id = parsePgIntId(raw);
+    if (id === null) throw badInput('Species not found.');
+    speciesIds.push(id);
+  }
+
+  const uniqueIds = [...new Set(speciesIds)];
+  const found = await prisma.species.count({ where: { id: { in: uniqueIds } } });
+  if (found !== uniqueIds.length) throw badInput('Species not found.');
+
+  return uniqueIds
 }
 
 export const resolvers = {
@@ -67,6 +130,21 @@ export const resolvers = {
         ];
       }
       return prisma.species.findMany({ where, orderBy: { commonName: 'asc' } });
+    },
+
+    foods: async(_parent: unknown, { search, type }: FoodsArgs, { prisma, userId }: Context) => {
+      const where: Prisma.FoodWhereInput = { OR: [{ ownerId: null }, { ownerId: userId }] };
+      where.AND = [];
+      if (type) where.AND.push({ type: type}) ;
+      if (search) where.AND.push({name: { contains: search, mode: 'insensitive' }})
+
+      return await prisma.food.findMany({ where, orderBy: { name: 'asc' } });
+    },
+
+    food: async(_parent: unknown, { id }: FoodArgs, { prisma, userId }: Context) => {
+      const foodId = parsePgIntId(id);
+      if (foodId === null) return null;
+      return await prisma.food.findFirst({ where: { id: foodId, OR: [{ ownerId: null }, { ownerId: userId }] } });
     },
   },
 
@@ -99,7 +177,7 @@ export const resolvers = {
       const tank = await prisma.tank.findFirst({ where: { id: input.tankId, ownerId: userId } });
       if (!tank) throw badInput('Tank not found.');
 
-      const speciesId = parseSpeciesId(input.speciesId);
+      const speciesId = parsePgIntId(input.speciesId);
       const species = speciesId === null ? null : await prisma.species.findUnique({ where: { id: speciesId } });
       if (!species) throw badInput('Species not found.');
 
@@ -144,6 +222,29 @@ export const resolvers = {
 
       return moved
     },
+
+    createFood: async(_parent: unknown, { input }: CreateFoodArgs, { prisma, userId }: Context) => {
+      const name = input.name.trim();
+      if (name === '') throw badInput('Food name is required.');
+
+      const speciesIds = await checkSpeciesIds(input.unsafeForSpeciesIds, prisma)
+
+      try {
+        return await prisma.food.create({
+          data: {
+            ownerId: userId,
+            name,
+            type: input.type,
+            unsafeFor: { connect: speciesIds.map((id) => ({ id })) }
+          }
+        });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw badInput('You already have a food with this name.');
+        }
+        throw error;
+      }
+    }
   },
 
   // Field resolvers run when the database row and the GraphQL type differ.
@@ -165,5 +266,13 @@ export const resolvers = {
       prisma.species.findUniqueOrThrow({ where: { id: livestock.speciesId } }),
 
     createdAt: (livestock: Livestock) => livestock.createdAt.toISOString(),
+  },
+
+  Food: {
+    // Runs once per food (N+1). Optimize using DataLoader in future
+    isCustom: (food: Food) => food.ownerId !== null,
+    unsafeFor: (food: Food, _args: unknown, { prisma }: Context) => {
+      return prisma.food.findUnique({ where: { id: food.id } }).unsafeFor()
+    }
   },
 };
