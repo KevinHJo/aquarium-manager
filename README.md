@@ -41,7 +41,8 @@ npm run db:import-species
 |---|---|
 | `npm run dev` | Start the GraphQL API on http://localhost:4000 with reload |
 | `npm test` | Migrate the test database, then run the tests against it |
-| `npm run typecheck` | Type-check without emitting |
+| `npm run codegen` | Regenerate `src/generated/graphql.ts` from `src/schema.graphql` (run after changing the schema) |
+| `npm run typecheck` | Run codegen, then type-check without emitting |
 | `npm run db:migrate -- --name <change>` | Create and apply a migration after editing `prisma/schema.prisma` |
 | `npm run db:import-species [file.csv]` | Validate and upsert the species catalog |
 | `npm run db:studio` | Browse the database in Prisma Studio |
@@ -55,7 +56,10 @@ server/
   prisma/schema.prisma      data model
   prisma/seed/species.csv   species catalog source
   scripts/                  database setup and the species import
-  src/typeDefs.ts           GraphQL schema
+  src/schema.graphql        GraphQL schema
+  src/typeDefs.ts           loads schema.graphql for Apollo
+  src/generated/graphql.ts  types generated from the schema by GraphQL Code Generator (don't edit)
+  codegen.ts                GraphQL Code Generator config
   src/resolvers.ts          GraphQL resolvers
   src/context.ts            per-request context (database client, current user)
   src/server.ts             builds the Apollo server (used by index.ts and tests)

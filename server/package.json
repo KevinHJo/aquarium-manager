@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "tsx watch --env-file=.env src/index.ts",
-    "typecheck": "tsc --noEmit",
+    "codegen": "graphql-codegen --config codegen.ts",
+    "typecheck": "npm run codegen && tsc --noEmit",
     "pretest": "dotenv -e .env.test -- prisma migrate deploy",
     "test": "dotenv -e .env.test -- vitest run",
     "db:migrate": "prisma migrate dev",
@@ -23,6 +24,9 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "^5.0.7",
+    "@graphql-codegen/typescript": "^4.1.6",
+    "@graphql-codegen/typescript-resolvers": "^4.5.2",
     "@types/node": "^22.10.0",
     "dotenv-cli": "^8.0.0",
     "prisma": "^6.16.0",

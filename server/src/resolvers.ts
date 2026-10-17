@@ -1,90 +1,7 @@
 import { Prisma } from '@prisma/client';
-import type {
-  Food,
-  FoodType,
-  FeedingSchedule,
-  FeedingLog,
-  Livestock,
-  LivestockStatus,
-  Tank,
-  WaterType
-} from '@prisma/client';
 import { GraphQLError } from 'graphql';
 import type { Context } from './context';
-
-// Argument types are written by hand for now and must be kept in step with
-// typeDefs.ts. GraphQL Code Generator will replace them later.
-interface TankArgs {
-  id: string;
-}
-
-interface SpeciesArgs {
-  search?: string | null;
-  waterType?: WaterType | null;
-}
-
-interface CreateTankArgs {
-  input: {
-    name: string;
-    hospital?: boolean | null;
-    volumeLiters: number;
-    waterType: WaterType;
-    notes?: string | null;
-  };
-}
-
-interface CreateLivestockArgs {
-  input: {
-    name?: string | null;
-    tankId: string;
-    speciesId: string;
-    status?: LivestockStatus | null;
-  }
-}
-interface MoveLivestockArgs {
-  input: {
-    livestockId: string;
-    newTankId: string;
-  }
-}
-
-interface FoodsArgs {
-  search?: string | null;
-  type?: FoodType | null;
-}
-
-interface FoodArgs {
-  id: string;
-}
-
-interface CreateFoodArgs {
-  input: {
-    name: string;
-    type: FoodType;
-    unsafeForSpeciesIds?: string[] | null;
-  }
-}
-
-interface CreateFeedingScheduleArgs {
-  input: {
-    tankId: string;
-    foodId: string;
-    feedingAmount: number;
-    feedingUnit: string;
-    startDate: string;
-    endDate?: string | null;
-    timesPerDay: number;
-    intervalDays: number;
-  }
-}
-
-interface CreateFeedingLogArgs {
-  input: {
-    scheduleId: string;
-    fedAt?: string | null;
-    notes?: string | null;
-  }
-}
+import type { Resolvers } from './generated/graphql';
 
 function badInput(message: string): GraphQLError {
   return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
@@ -111,16 +28,16 @@ async function checkSpeciesIds(ids: string[] | null | undefined, prisma: Context
   return uniqueIds
 }
 
-export const resolvers = {
+export const resolvers: Resolvers = {
   Query: {
-    tanks: (_parent: unknown, _args: unknown, { prisma, userId }: Context) =>
+    tanks: (_parent, _args, { prisma, userId }) =>
       prisma.tank.findMany({ where: { ownerId: userId }, orderBy: { createdAt: 'asc' } }),
 
     // Filtering on ownerId as well as id is what stops one user reading another's tank.
-    tank: (_parent: unknown, { id }: TankArgs, { prisma, userId }: Context) =>
+    tank: (_parent, { id }, { prisma, userId }) =>
       prisma.tank.findFirst({ where: { id, ownerId: userId } }),
 
-    species: (_parent: unknown, { search, waterType }: SpeciesArgs, { prisma }: Context) => {
+    species: (_parent, { search, waterType }, { prisma }) => {
       const where: Prisma.SpeciesWhereInput = {};
       if (waterType) where.waterType = waterType;
       if (search) {
@@ -132,7 +49,7 @@ export const resolvers = {
       return prisma.species.findMany({ where, orderBy: { commonName: 'asc' } });
     },
 
-    foods: async(_parent: unknown, { search, type }: FoodsArgs, { prisma, userId }: Context) => {
+    foods: async(_parent, { search, type }, { prisma, userId }) => {
       const where: Prisma.FoodWhereInput = { OR: [{ ownerId: null }, { ownerId: userId }] };
       where.AND = [];
       if (type) where.AND.push({ type: type}) ;
@@ -141,7 +58,7 @@ export const resolvers = {
       return await prisma.food.findMany({ where, orderBy: { name: 'asc' } });
     },
 
-    food: async(_parent: unknown, { id }: FoodArgs, { prisma, userId }: Context) => {
+    food: async(_parent, { id }, { prisma, userId }) => {
       const foodId = parsePgIntId(id);
       if (foodId === null) return null;
       return await prisma.food.findFirst({ where: { id: foodId, OR: [{ ownerId: null }, { ownerId: userId }] } });
@@ -149,7 +66,7 @@ export const resolvers = {
   },
 
   Mutation: {
-    createTank: (_parent: unknown, { input }: CreateTankArgs, { prisma, userId }: Context) => {
+    createTank: (_parent, { input }, { prisma, userId }) => {
       const name = input.name.trim();
       if (name === '') throw badInput('Tank name is required.');
       if (input.volumeLiters <= 0) throw badInput('Tank volume must be greater than zero.');
@@ -166,9 +83,9 @@ export const resolvers = {
       });
     },
     createLivestock: async (
-      _parent: unknown,
-      { input }: CreateLivestockArgs,
-      { prisma, userId }: Context,
+      _parent,
+      { input },
+      { prisma, userId },
     ) => {
       let name = input.name?.trim();
       name = name === '' ? undefined : name;
@@ -192,7 +109,7 @@ export const resolvers = {
         },
       });
     },
-    moveLivestock: async(_parent: unknown, { input }: MoveLivestockArgs, { prisma, userId }: Context) => {
+    moveLivestock: async(_parent, { input }, { prisma, userId }) => {
       const livestock = await prisma.livestock.findFirst({
         where: { id: input.livestockId, tank: { ownerId: userId } }
       });
@@ -223,7 +140,7 @@ export const resolvers = {
       return moved
     },
 
-    createFood: async(_parent: unknown, { input }: CreateFoodArgs, { prisma, userId }: Context) => {
+    createFood: async(_parent, { input }, { prisma, userId }) => {
       const name = input.name.trim();
       if (name === '') throw badInput('Food name is required.');
 
@@ -250,10 +167,10 @@ export const resolvers = {
   // Field resolvers run when the database row and the GraphQL type differ.
   // Fields with matching names (name, volumeLiters, ...) resolve automatically.
   Tank: {
-    createdAt: (tank: Tank) => tank.createdAt.toISOString(),
+    createdAt: (tank) => tank.createdAt.toISOString(),
 
     // Only fish still in the tank. Dead and sold fish keep their rows for history.
-    livestock: (tank: Tank, _args: unknown, { prisma }: Context) =>
+    livestock: (tank, _args, { prisma }) =>
       prisma.livestock.findMany({
         where: { tankId: tank.id, status: { notIn: ['DECEASED', 'SOLD'] } },
         orderBy: { createdAt: 'asc' },
@@ -262,17 +179,17 @@ export const resolvers = {
 
   Livestock: {
     // Runs once per fish, so a tank of 20 fish makes 20 species queries (N+1). Optimize using DataLoader in future
-    species: (livestock: Livestock, _args: unknown, { prisma }: Context) =>
+    species: (livestock, _args, { prisma }) =>
       prisma.species.findUniqueOrThrow({ where: { id: livestock.speciesId } }),
 
-    createdAt: (livestock: Livestock) => livestock.createdAt.toISOString(),
+    createdAt: (livestock) => livestock.createdAt.toISOString(),
   },
 
   Food: {
     // Runs once per food (N+1). Optimize using DataLoader in future
-    isCustom: (food: Food) => food.ownerId !== null,
-    unsafeFor: (food: Food, _args: unknown, { prisma }: Context) => {
-      return prisma.food.findUnique({ where: { id: food.id } }).unsafeFor()
-    }
+    isCustom: (food) => food.ownerId !== null,
+    // findMany always returns a list, which matches the non-null [Species!]! in the schema.
+    unsafeFor: (food, _args, { prisma }) =>
+      prisma.species.findMany({ where: { unsafeFoods: { some: { id: food.id } } } }),
   },
 };
